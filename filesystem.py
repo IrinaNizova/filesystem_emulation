@@ -1,9 +1,16 @@
+import re
+
 class File:
     def __init__(self, *args, **kwargs):
         self.name = kwargs['name']
 
     def __str__(self):
         return 'file ' + self.name
+
+    @staticmethod
+    def print_class():
+        return 'file'
+
 
 class Directory(dict):
 
@@ -12,26 +19,31 @@ class Directory(dict):
         self.name = kwargs['name']
 
     def __str__(self):
-        return 'directory '
+        return 'directory ' + self.name
+
+    @staticmethod
+    def print_class():
+        return 'directory'
 
 
 class Filesystem:
 
-    types = {Directory: 'directory', File: 'file'}
-
     def __init__(self):
         self.filesystem = {}
 
+    def print_type(self, obj):
+        return obj.print_class()
+
     def _create_element(self, path, name, el_type):
         if not name:
-            raise NameError(self.types[el_type] + ' name is empty')
+            raise EmptyNameError('{} name is empty'.format(self.print_type(el_type)))
         if '/' in name:
-            raise ValueError('/ is forbidden symbol in {} name'.format(self.types[el_type]))
+            raise SlashExistsError('/ is forbidden symbol in {} name'.format(self.print_type(el_type)))
         parent_dir = self._get_reference_for_el(path)
         if parent_dir is None:
-            raise ValueError('Path is not valid')
+            raise NotValidPathError('Path is not valid')
         if name in parent_dir.keys():
-            raise KeyError('This {} has already exists'.format(self.types[el_type]))
+            raise AlreadyExists('This {} has already exists'.format(self.print_type(el_type)))
         parent_dir[name] = Directory(name=name) if el_type == Directory else File(name=name)
 
     def create_dir(self, path, name):
@@ -43,24 +55,29 @@ class Filesystem:
     def get_list_dir(self, path):
         current_dir = self._get_reference_for_el(path)
         if current_dir is None:
-            raise KeyError('Path is not valid')
+            raise NotValidPathError('Path is not valid')
         if not isinstance(current_dir, dict):
             raise TypeError('This is file, not directory')
         return list(self._get_reference_for_el(path).keys())
 
     def find_files_for_pattern(self, path, pattern):
-        pass
+        pattern = "^" + pattern.replace('*', '.*') + "$"
+        finded_files = []
+        for el in self.get_list_dir(path):
+            if re.search(pattern, el):
+                finded_files.append(el)
+        return finded_files
 
     def _delete_element(self, path, name, el_type):
         parent_dir = self._get_reference_for_el(path)
         if parent_dir is None:
-            raise KeyError('Path is not valid')
+            raise NotValidPathError('Path is not valid')
         if name not in parent_dir.keys():
-            raise ValueError('This {} does not exist'.format(self.types[el_type]))
+            raise NotExistsError('This {} does not exist'.format(self.print_type(el_type)))
         if not isinstance(parent_dir[name], el_type):
-            raise TypeError('This is not {}'.format(self.types[el_type]))
+            raise TypeError('This is not {}'.format(self.print_type(el_type)))
         if el_type == Directory and len(parent_dir[name]) > 0:
-            raise ValueError('This {} does not empty'.format(self.types[el_type]))
+            raise ValueError('This {} does not empty'.format(self.print_type(el_type)))
         del parent_dir[name]
 
     def delete_file(self, path, name):
@@ -79,3 +96,23 @@ class Filesystem:
             except KeyError:
                 return None
         return filesystem
+
+
+class EmptyNameError(NameError):
+    pass
+
+
+class SlashExistsError(ValueError):
+    pass
+
+
+class NotValidPathError(ValueError):
+    pass
+
+
+class AlreadyExists(KeyError):
+    pass
+
+
+class NotExistsError(KeyError):
+    pass

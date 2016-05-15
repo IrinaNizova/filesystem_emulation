@@ -1,12 +1,20 @@
 import unittest
 
+
+class File:
+    def __init__(self, *args, **kwargs):
+        self.name = kwargs['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Filesystem:
 
-    types = {dict: 'directory', str: 'file'}
+    types = {dict: 'directory', File: 'file'}
 
     def __init__(self):
         self.filesystem = {}
-
 
     def _create_element(self, path, name, type):
         if not name:
@@ -18,25 +26,24 @@ class Filesystem:
             return ValueError('Path is not valid')
         if name in parent_dir.keys():
             return KeyError('This {} has already exists'.format(self.types[type]))
-        parent_dir[name] = {} if type == dict else ''
-
+        parent_dir[name] = {} if type == dict else File(name=name)
 
     def create_dir(self, path, name):
         return self._create_element(path, name, dict)
 
-
     def create_file(self, path, name):
-        return self._create_element(path, name, str)
-
+        return self._create_element(path, name, File)
 
     def get_list_dir(self, path):
         p = self._get_reference(path)
         if p == False:
             return KeyError('Path is not valid')
-        if isinstance(p, str):
+        if not isinstance(p, dict):
             return TypeError('This is file, not directory')
         return list(self._get_reference(path).keys())
 
+    def find_files_for_pattern(self, path, pattern):
+        pass
 
     def _delete_element(self, path, name, type):
         p = self._get_reference(path)
@@ -50,14 +57,11 @@ class Filesystem:
             return ValueError('This {} does not empty'.format(self.types[type]))
         del p[name]
 
-
     def delete_file(self, path, name):
-        return self._delete_element(path, name, str)
-
+        return self._delete_element(path, name, File)
 
     def delete_dir(self, path, name):
         return self._delete_element(path, name, dict)
-
 
     def _get_reference(self, path):
         p = self.filesystem
@@ -109,16 +113,15 @@ class TestFilesystem(unittest.TestCase):
 
     def test21CreateRootFile(self):
         self.assertEqual(self.filesystem.create_file(self.root_dir, 'file'), None, "File not create")
-        self.assertEqual(self.filesystem.filesystem['file'], '', 'File is not detected')
+        self.assertTrue(isinstance(self.filesystem.filesystem['file'], File), 'File is not detected')
 
     def test22CreateNotRootFile(self):
         self.assertEqual(self.filesystem.create_file(self.user_dir, 'file'), None, "File not create")
-        self.assertEqual(self.filesystem.filesystem['home']['user']['file'], '', 'File is not detected')
+        self.assertTrue(isinstance(self.filesystem.filesystem['home']['user']['file'], File), 'File is not detected')
 
     def test23CreateFileWrongPath(self):
         self.assertTrue(isinstance(self.filesystem.create_file(self.fake_dir, 'file'),
                                         ValueError), "File not create")
-
     def test24CreateEmptyNameFile(self):
         self.assertTrue(isinstance(self.filesystem.create_file(self.home_dir, ''),
             NameError), "File is created should not be at not exception is not correct")
@@ -130,7 +133,6 @@ class TestFilesystem(unittest.TestCase):
     def test26CreateExistNameFile(self):
         self.assertTrue(isinstance(self.filesystem.create_dir(self.root_dir, 'file'),
             KeyError), "File is created should not be at not exception is not correct")
-
 
     def test31ListRootDir(self):
         self.assertEqual(sorted(self.filesystem.get_list_dir(self.root_dir)),
@@ -156,7 +158,6 @@ class TestFilesystem(unittest.TestCase):
         self.assertEqual(self.filesystem.delete_file(self.user_dir, 'file'), None, "File not delete")
         self.assertFalse('file' in list(self.filesystem.filesystem['home']['user'].keys()),
                          'File was not deleted')
-
 
     def test52DelAlreadyDeletingFile(self):
         self.assertTrue(isinstance(self.filesystem.delete_file(self.home_dir, 'file'),ValueError),
